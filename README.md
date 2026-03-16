@@ -88,3 +88,5 @@ pocketpilot/
 - The app uses SQLite and creates `pocketpilot.db` automatically on first run.
 - Remaining balance is calculated as `savings - expenses - investments`.
 - Goal progress uses the current remaining balance as available savings.
+
+test change
