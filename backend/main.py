@@ -4,7 +4,7 @@ import calendar
 from datetime import date
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -177,7 +177,7 @@ def update_transaction(
     )
 
 
-@app.delete("/api/transactions/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/transactions/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response, response_model=None)
 def delete_transaction(
     transaction_id: int,
     user_id: int = Depends(get_current_user_id),
@@ -324,7 +324,7 @@ def add_goal_deposit(
     return _goal_with_deposits(dict(goal_row), user_id)
 
 
-@app.delete("/api/goals/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
+@app.delete("/api/goals/{goal_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response, response_model=None)
 def delete_goal(goal_id: int, user_id: int = Depends(get_current_user_id)) -> None:
     row = fetch_one("SELECT id FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
     if not row:
