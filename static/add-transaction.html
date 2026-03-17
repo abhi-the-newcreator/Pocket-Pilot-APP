@@ -28,6 +28,32 @@
         .set-budget-row { display: flex; gap: 10px; margin-top: 14px; }
         .set-budget-row input { flex: 1; }
         @media (max-width: 720px) { .cat-grid { grid-template-columns: repeat(3, 1fr); } }
+
+        /* Action buttons in table */
+        .action-btn {
+            padding: 5px 10px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 0.82rem; font-weight: 700; transition: 120ms ease; font-family: inherit;
+        }
+        .edit-btn { background: rgba(15,118,110,0.12); color: var(--primary); margin-right: 6px; }
+        .edit-btn:hover { background: rgba(15,118,110,0.24); }
+        .delete-btn { background: rgba(194,65,12,0.1); color: var(--danger); }
+        .delete-btn:hover { background: rgba(194,65,12,0.2); }
+
+        /* Edit Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 1000;
+            background: rgba(18,26,32,0.55); backdrop-filter: blur(6px);
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-box {
+            background: var(--surface-strong); border-radius: var(--radius-xl);
+            box-shadow: 0 40px 80px rgba(18,26,32,0.3); padding: 28px;
+            width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; font-family: 'Space Grotesk', sans-serif; }
+        .modal-close { background: none; border: none; font-size: 1.4rem; cursor: pointer; line-height: 1; color: var(--muted); }
+        .modal-close:hover { color: var(--danger); }
     </style>
 </head>
 <body>
@@ -48,7 +74,7 @@
             </nav>
             <div class="sidebar-card">
                 <h3>Quick tip</h3>
-                <p>Pick a category, enter the shop name and amount — done in 5 seconds.</p>
+                <p>Pick a category, enter the shop name and amount — done in 5 seconds. Edit or delete any transaction from the table below.</p>
             </div>
             <div id="sidebarUser"></div>
         </aside>
@@ -142,6 +168,39 @@
                 <div id="transactionTableWrap"></div>
             </section>
         </main>
+    </div>
+
+    <!-- Edit Transaction Modal -->
+    <div id="editModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>✏️ Edit Transaction</h3>
+                <button class="modal-close" onclick="closeEditModal()">✕</button>
+            </div>
+            <div class="form-grid">
+                <div class="field">
+                    <label for="editAmount">Amount (₹)</label>
+                    <input type="number" id="editAmount" min="1" step="1">
+                </div>
+                <div class="field">
+                    <label for="editMerchant">Shop / Place</label>
+                    <input type="text" id="editMerchant" maxlength="80">
+                </div>
+                <div class="field full">
+                    <label for="editDate">Date</label>
+                    <input type="date" id="editDate">
+                </div>
+            </div>
+            <div style="margin-top:16px;">
+                <label style="display:block;margin-bottom:10px;">Category</label>
+                <div class="cat-grid" id="editCategoryGrid"></div>
+                <input type="hidden" id="editSelectedCategory">
+            </div>
+            <div class="btn-row" style="margin-top:20px;">
+                <button class="btn primary" onclick="saveEditTransaction()">Save changes</button>
+                <button class="btn secondary" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </div>
     </div>
 </body>
 </html>

@@ -42,8 +42,16 @@ def init_db() -> None:
                 user_id INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 name TEXT NOT NULL,
-                target_amount REAL NOT NULL,
-                monthly_saving_amount REAL NOT NULL
+                target_amount REAL NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS goal_deposits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                goal_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                date TEXT NOT NULL,
+                FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS monthly_budget (
@@ -56,13 +64,19 @@ def init_db() -> None:
             );
             """
         )
-        # Migrate existing tables: add user_id column if it doesn't exist yet
+        # Migrate existing tables
         for table in ("transactions", "goals"):
             try:
                 connection.execute(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0")
                 connection.commit()
             except sqlite3.OperationalError:
                 pass  # column already exists
+        # Remove monthly_saving_amount from goals (handled by new deposit system)
+        try:
+            connection.execute("ALTER TABLE goals ADD COLUMN _dummy INTEGER")
+            connection.commit()
+        except sqlite3.OperationalError:
+            pass
 
 
 def fetch_all(query: str, params: tuple[Any, ...] = ()) -> list[sqlite3.Row]:

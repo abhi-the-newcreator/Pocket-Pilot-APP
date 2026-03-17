@@ -14,10 +14,13 @@ from backend.database import execute, fetch_all, fetch_one, init_db
 from backend.schemas import (
     BudgetSet,
     GoalCreate,
+    GoalDepositCreate,
+    GoalDepositResponse,
     GoalResponse,
     TokenResponse,
     TransactionCreate,
     TransactionResponse,
+    TransactionUpdate,
     UserLogin,
     UserRegister,
 )
@@ -26,7 +29,7 @@ from backend.services import CATEGORY_OPTIONS, CATEGORY_TO_BUCKET, analytics_sum
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
-app = FastAPI(title="PocketPilot API", version="3.0.0")
+app = FastAPI(title="PocketPilot API", version="4.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -136,6 +139,55 @@ def list_transactions(user_id: int = Depends(get_current_user_id)) -> list[Trans
     return [TransactionResponse(**dict(row)) for row in rows]
 
 
+@app.put("/api/transactions/{transaction_id}", response_model=TransactionResponse)
+def update_transaction(
+    transaction_id: int,
+    payload: TransactionUpdate,
+    user_id: int = Depends(get_current_user_id),
+) -> TransactionResponse:
+    row = fetch_one("SELECT * FROM transactions WHERE id = ? AND user_id = ?", (transaction_id, user_id))
+    if not row:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+
+    existing = dict(row)
+
+    # Resolve updated fields
+    new_category = payload.category or existing["category"]
+    new_bucket = CATEGORY_TO_BUCKET.get(new_category)
+    if not new_bucket:
+        raise HTTPException(status_code=400, detail=f"Invalid category '{new_category}'.")
+
+    new_merchant = payload.merchant.strip().title() if payload.merchant else existing["merchant"]
+    new_amount = payload.amount if payload.amount is not None else existing["amount"]
+    new_date = payload.date.isoformat() if payload.date else existing["date"]
+
+    execute(
+        "UPDATE transactions SET amount = ?, merchant = ?, category = ?, bucket = ?, date = ? WHERE id = ? AND user_id = ?",
+        (new_amount, new_merchant, new_category, new_bucket, new_date, transaction_id, user_id),
+    )
+
+    return TransactionResponse(
+        id=transaction_id,
+        date=new_date,
+        amount=new_amount,
+        merchant=new_merchant,
+        category=new_category,
+        bucket=new_bucket,
+        original_message=existing["original_message"],
+    )
+
+
+@app.delete("/api/transactions/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_transaction(
+    transaction_id: int,
+    user_id: int = Depends(get_current_user_id),
+) -> None:
+    row = fetch_one("SELECT id FROM transactions WHERE id = ? AND user_id = ?", (transaction_id, user_id))
+    if not row:
+        raise HTTPException(status_code=404, detail="Transaction not found.")
+    execute("DELETE FROM transactions WHERE id = ? AND user_id = ?", (transaction_id, user_id))
+
+
 # ── Budget ─────────────────────────────────────────────────────────────────────
 
 def _budget_status(user_id: int) -> dict:
@@ -219,35 +271,66 @@ def analytics_data(user_id: int = Depends(get_current_user_id)) -> dict:
 
 # ── Goals ──────────────────────────────────────────────────────────────────────
 
+def _goal_with_deposits(goal: dict, user_id: int) -> GoalResponse:
+    """Fetch deposits for a goal and build GoalResponse."""
+    deposit_rows = fetch_all(
+        "SELECT * FROM goal_deposits WHERE goal_id = ? AND user_id = ? ORDER BY date ASC, id ASC",
+        (goal["id"], user_id),
+    )
+    deposits = [GoalDepositResponse(id=r["id"], goal_id=r["goal_id"], amount=r["amount"], date=r["date"]) for r in deposit_rows]
+    total_deposited = sum(d.amount for d in deposits)
+    progress = compute_goal_progress(goal, total_deposited)
+    return GoalResponse(
+        id=goal["id"],
+        created_at=goal["created_at"],
+        name=goal["name"],
+        target_amount=goal["target_amount"],
+        deposits=deposits,
+        **progress,
+    )
+
+
 @app.post("/api/goals", response_model=GoalResponse)
 def create_goal(payload: GoalCreate, user_id: int = Depends(get_current_user_id)) -> GoalResponse:
     goal_id = execute(
-        "INSERT INTO goals (user_id, created_at, name, target_amount, monthly_saving_amount) VALUES (?, ?, ?, ?, ?)",
-        (user_id, today_iso(), payload.name, payload.target_amount, payload.monthly_saving_amount),
+        "INSERT INTO goals (user_id, created_at, name, target_amount) VALUES (?, ?, ?, ?)",
+        (user_id, today_iso(), payload.name, payload.target_amount),
     )
-    rows = fetch_all("SELECT * FROM transactions WHERE user_id = ? ORDER BY date ASC, id ASC", (user_id,))
-    summary = analytics_summary([dict(row) for row in rows])
-    progress = compute_goal_progress(
-        {"target_amount": payload.target_amount, "monthly_saving_amount": payload.monthly_saving_amount},
-        summary["totals"]["remaining_balance"],
-    )
-    return GoalResponse(
-        id=goal_id, created_at=today_iso(), name=payload.name,
-        target_amount=payload.target_amount, monthly_saving_amount=payload.monthly_saving_amount,
-        **progress,
-    )
+    goal = {"id": goal_id, "created_at": today_iso(), "name": payload.name, "target_amount": payload.target_amount}
+    return _goal_with_deposits(goal, user_id)
 
 
 @app.get("/api/goals", response_model=list[GoalResponse])
 def list_goals(user_id: int = Depends(get_current_user_id)) -> list[GoalResponse]:
     rows = fetch_all("SELECT * FROM goals WHERE user_id = ? ORDER BY id DESC", (user_id,))
-    transactions = [dict(row) for row in fetch_all("SELECT * FROM transactions WHERE user_id = ? ORDER BY date ASC, id ASC", (user_id,))]
-    available_savings = analytics_summary(transactions)["totals"]["remaining_balance"]
-    goals: list[GoalResponse] = []
-    for row in rows:
-        goal = dict(row)
-        goals.append(GoalResponse(**goal, **compute_goal_progress(goal, available_savings)))
-    return goals
+    return [_goal_with_deposits(dict(row), user_id) for row in rows]
+
+
+@app.post("/api/goals/{goal_id}/deposit", response_model=GoalResponse)
+def add_goal_deposit(
+    goal_id: int,
+    payload: GoalDepositCreate,
+    user_id: int = Depends(get_current_user_id),
+) -> GoalResponse:
+    goal_row = fetch_one("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    if not goal_row:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+
+    deposit_date = payload.date.isoformat() if payload.date else today_iso()
+    execute(
+        "INSERT INTO goal_deposits (goal_id, user_id, amount, date) VALUES (?, ?, ?, ?)",
+        (goal_id, user_id, payload.amount, deposit_date),
+    )
+    return _goal_with_deposits(dict(goal_row), user_id)
+
+
+@app.delete("/api/goals/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_goal(goal_id: int, user_id: int = Depends(get_current_user_id)) -> None:
+    row = fetch_one("SELECT id FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    if not row:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    execute("DELETE FROM goal_deposits WHERE goal_id = ? AND user_id = ?", (goal_id, user_id))
+    execute("DELETE FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
 
 
 # ── Static pages ──────────────────────────────────────────────────────────────

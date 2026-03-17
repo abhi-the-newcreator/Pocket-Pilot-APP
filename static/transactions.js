@@ -121,6 +121,62 @@ async function handleTransactionSubmit(event) {
     }
 }
 
+// ── Edit Modal ────────────────────────────────────────────────────────────────
+
+let _editId = null;
+
+function openEditModal(t) {
+    _editId = t.id;
+    document.getElementById('editAmount').value = t.amount;
+    document.getElementById('editMerchant').value = t.merchant;
+    document.getElementById('editDate').value = t.date;
+    // Highlight category
+    document.querySelectorAll('.edit-cat-btn').forEach(btn => {
+        btn.classList.toggle('selected', btn.dataset.cat === t.category);
+    });
+    document.getElementById('editSelectedCategory').value = t.category;
+    document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    _editId = null;
+}
+
+function selectEditCategory(catId) {
+    document.querySelectorAll('.edit-cat-btn').forEach(btn => btn.classList.remove('selected'));
+    const btn = document.querySelector(`.edit-cat-btn[data-cat="${catId}"]`);
+    if (btn) btn.classList.add('selected');
+    document.getElementById('editSelectedCategory').value = catId;
+}
+
+async function saveEditTransaction() {
+    if (!_editId) return;
+    const payload = {
+        amount: parseFloat(document.getElementById('editAmount').value),
+        merchant: document.getElementById('editMerchant').value.trim(),
+        category: document.getElementById('editSelectedCategory').value,
+        date: document.getElementById('editDate').value || null,
+    };
+    try {
+        await apiFetch(`/transactions/${_editId}`, { method: 'PUT', body: JSON.stringify(payload) });
+        closeEditModal();
+        await Promise.all([loadTransactions(), loadBudget()]);
+    } catch (err) {
+        alert(err.message);
+    }
+}
+
+async function deleteTransaction(id) {
+    if (!confirm('Delete this transaction? This cannot be undone.')) return;
+    try {
+        await apiFetch(`/transactions/${id}`, { method: 'DELETE' });
+        await Promise.all([loadTransactions(), loadBudget()]);
+    } catch (err) {
+        alert(err.message);
+    }
+}
+
 // ── Load & render transactions ────────────────────────────────────────────────
 
 async function loadTransactions() {
@@ -165,16 +221,20 @@ async function loadTransactions() {
     wrap.innerHTML = `
         <table class="table">
             <thead>
-                <tr><th>Date</th><th>Shop</th><th>Category</th><th>Bucket</th><th>Amount</th></tr>
+                <tr><th>Date</th><th>Shop</th><th>Category</th><th>Bucket</th><th>Amount</th><th style="text-align:center;">Actions</th></tr>
             </thead>
             <tbody>
                 ${transactions.map(t => `
-                    <tr>
+                    <tr data-id="${t.id}">
                         <td>${t.date}</td>
                         <td>${t.merchant}</td>
                         <td>${t.category}</td>
                         <td><span class="tag ${t.bucket.toLowerCase()}">${t.bucket}</span></td>
                         <td><strong>${formatCurrency(t.amount)}</strong></td>
+                        <td style="text-align:center;white-space:nowrap;">
+                            <button class="action-btn edit-btn" onclick='openEditModal(${JSON.stringify(t)})' title="Edit">✏️ Edit</button>
+                            <button class="action-btn delete-btn" onclick="deleteTransaction(${t.id})" title="Delete">🗑️ Delete</button>
+                        </td>
                     </tr>`).join('')}
             </tbody>
         </table>`;
@@ -184,8 +244,27 @@ async function loadTransactions() {
 
 async function initPage() {
     buildCategoryGrid();
+
+    // Build edit modal category grid
+    const editGrid = document.getElementById('editCategoryGrid');
+    if (editGrid) {
+        editGrid.innerHTML = CATEGORIES.map(cat => `
+            <button type="button" class="cat-btn edit-cat-btn" data-cat="${cat.id}" onclick="selectEditCategory('${cat.id}')">
+                <span class="cat-icon">${cat.icon}</span>
+                ${cat.label}
+            </button>
+        `).join('');
+    }
+
     document.getElementById('dateInput').valueAsDate = new Date();
     document.getElementById('transactionForm').addEventListener('submit', handleTransactionSubmit);
+
+    // Close modal on backdrop click
+    const modal = document.getElementById('editModal');
+    if (modal) {
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeEditModal(); });
+    }
+
     await Promise.all([loadTransactions(), loadBudget()]);
 }
 

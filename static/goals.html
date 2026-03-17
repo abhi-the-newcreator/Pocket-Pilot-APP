@@ -7,6 +7,29 @@
     <link rel="stylesheet" href="/static/styles.css">
     <script defer src="/static/app.js"></script>
     <script defer src="/static/goals.js"></script>
+    <style>
+        .deposit-section {
+            margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid var(--line);
+        }
+        .deposit-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+        .deposit-row .field { flex: 1; min-width: 120px; }
+        .deposit-history { margin-top: 14px; display: grid; gap: 8px; }
+        .deposit-entry {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 14px; border-radius: 12px;
+            background: rgba(21,128,61,0.07); border: 1px solid rgba(21,128,61,0.14);
+        }
+        .deposit-entry .dep-amount { font-weight: 800; color: var(--success); }
+        .deposit-entry .dep-date { font-size: 0.82rem; color: var(--muted); font-weight: 700; }
+        .deposit-msg { font-size: 0.82rem; margin-top: 6px; min-height: 24px; }
+        .goal-delete-btn {
+            padding: 5px 12px; border: 1px solid rgba(194,65,12,0.2); border-radius: 8px;
+            background: rgba(194,65,12,0.07); color: var(--danger); cursor: pointer;
+            font-size: 0.8rem; font-weight: 700; transition: 120ms ease; font-family: inherit;
+        }
+        .goal-delete-btn:hover { background: rgba(194,65,12,0.18); }
+    </style>
 </head>
 <body>
     <div class="layout">
@@ -26,7 +49,7 @@
             </nav>
             <div class="sidebar-card">
                 <h3>Goal planning</h3>
-                <p>Set a target, define your monthly savings pace, and estimate when you can hit it.</p>
+                <p>Set a target, add deposits anytime, and watch your savings grow towards your goal — tracked separately from your expenses.</p>
             </div>
             <div id="sidebarUser"></div>
         </aside>
@@ -34,7 +57,7 @@
             <div class="topbar">
                 <div>
                     <h2>Goal-based savings tracker</h2>
-                    <p>Map each savings goal to your current available balance and monthly savings habit.</p>
+                    <p>Create savings goals and add deposits anytime. Your savings are tracked independently from your expenses.</p>
                 </div>
             </div>
 
@@ -48,13 +71,9 @@
                             <label for="goalName">Goal name</label>
                             <input id="goalName" placeholder="Laptop upgrade">
                         </div>
-                        <div class="field">
-                            <label for="targetAmount">Target amount</label>
+                        <div class="field full">
+                            <label for="targetAmount">Target amount (₹)</label>
                             <input id="targetAmount" type="number" min="1" step="1" placeholder="50000">
-                        </div>
-                        <div class="field">
-                            <label for="monthlySavingAmount">Monthly saving amount</label>
-                            <input id="monthlySavingAmount" type="number" min="1" step="1" placeholder="5000">
                         </div>
                         <div class="field full btn-row">
                             <button type="submit" class="btn primary">Create goal</button>
@@ -67,9 +86,9 @@
                         <h3>How progress is calculated</h3>
                     </div>
                     <div class="alerts">
-                        <div class="alert suggestion">Amount saved uses your current remaining balance, so goals reflect your live financial position.</div>
-                        <div class="alert suggestion">Estimated months = remaining amount ÷ monthly saving amount.</div>
-                        <div class="alert suggestion">If you want faster progress, increase savings inflow or reduce avoidable expenses.</div>
+                        <div class="alert suggestion">Add deposits anytime — any amount, any day. Each deposit is recorded separately and shown in the goal card.</div>
+                        <div class="alert suggestion">Your saved amount = sum of all deposits you've added to this goal. It's independent from your expense transactions.</div>
+                        <div class="alert suggestion">Progress bar fills as your deposits approach the target amount.</div>
                     </div>
                 </article>
             </section>

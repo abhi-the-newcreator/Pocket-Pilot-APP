@@ -8,6 +8,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script defer src="/static/app.js"></script>
     <script defer src="/static/analytics.js"></script>
+    <style>
+        .ai-advisor-card { background: linear-gradient(135deg, rgba(15,118,110,0.08), rgba(139,92,246,0.06)); }
+        .ai-key-row { display: flex; gap: 10px; margin-bottom: 14px; }
+        .ai-key-row input { flex: 1; }
+        .ai-response { white-space: pre-wrap; line-height: 1.7; color: var(--text); font-size: 0.95rem; }
+        .ai-spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid var(--primary-soft); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .pie-3d-wrap { position: relative; min-height: 320px; perspective: 600px; }
+        .pie-3d-wrap canvas { transform: rotateX(14deg) scaleY(0.88); filter: drop-shadow(0 18px 24px rgba(15,118,110,0.28)); }
+    </style>
 </head>
 <body>
     <div class="layout">
@@ -47,14 +57,14 @@
                     <div class="metric-trend danger">Expense load per active day</div>
                 </article>
                 <article class="card">
-                    <div class="metric-label">Tracked days</div>
-                    <div class="metric-value" id="activeDaysMetric">0</div>
-                    <div class="metric-trend">Time span with transactions</div>
+                    <div class="metric-label">💰 Money will last</div>
+                    <div class="metric-value" id="activeDaysMetric">—</div>
+                    <div class="metric-trend">Days until balance runs out</div>
                 </article>
                 <article class="card">
-                    <div class="metric-label">Forecast</div>
+                    <div class="metric-label">📅 Days left in month</div>
                     <div class="metric-value" id="forecastMetric">-</div>
-                    <div class="metric-trend">Predicted days left</div>
+                    <div class="metric-trend">Remaining days this month</div>
                 </article>
                 <article class="card">
                     <div class="metric-label">Top expense category</div>
@@ -68,7 +78,7 @@
                     <div class="panel-header">
                         <h3>Expense distribution</h3>
                     </div>
-                    <div class="chart-wrap">
+                    <div class="pie-3d-wrap">
                         <canvas id="expenseChart"></canvas>
                     </div>
                 </article>
@@ -78,6 +88,20 @@
                     </div>
                     <div class="alerts" id="analyticsWarnings"></div>
                 </article>
+            </section>
+
+            <!-- AI Money Advisor -->
+            <section class="card ai-advisor-card" style="margin-top: 20px;">
+                <div class="panel-header">
+                    <h3>🤖 AI Money Advisor</h3>
+                    <span class="badge" style="font-size:0.78rem;">Powered by Gemini</span>
+                </div>
+                <p class="muted" style="margin-bottom:14px;">Get personalised money-saving advice based on your actual spending. Enter your free Gemini API key to activate.</p>
+                <div class="ai-key-row" id="aiKeyRow">
+                    <input type="password" id="geminiApiKey" placeholder="Paste your free Gemini API key (aistudio.google.com/apikey)">
+                    <button class="btn primary" onclick="getAIAdvice()">Get Advice</button>
+                </div>
+                <div id="aiAdviceOutput"></div>
             </section>
 
             <section class="card" style="margin-top: 20px;">

@@ -205,11 +205,14 @@ def analytics_summary(transactions: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def compute_goal_progress(goal: dict[str, Any], available_savings: float) -> dict[str, Any]:
-    amount_saved = min(max(available_savings, 0.0), float(goal["target_amount"]))
-    remaining_amount = max(float(goal["target_amount"]) - amount_saved, 0.0)
-    estimated_months = round(remaining_amount / float(goal["monthly_saving_amount"]), 1) if remaining_amount else 0.0
+def compute_goal_progress(goal: dict[str, Any], total_deposited: float) -> dict[str, Any]:
+    target = float(goal["target_amount"])
+    amount_saved = min(max(total_deposited, 0.0), target)
+    remaining_amount = max(target - amount_saved, 0.0)
+    # Estimate ETA from deposited amount (no monthly_saving_amount anymore)
+    estimated_months = 0.0
     return {
+        "total_deposited": round(total_deposited, 2),
         "amount_saved": round(amount_saved, 2),
         "remaining_amount": round(remaining_amount, 2),
         "estimated_months": estimated_months,

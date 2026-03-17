@@ -38,6 +38,13 @@ class TransactionCreate(BaseModel):
     date: date_type | None = None
 
 
+class TransactionUpdate(BaseModel):
+    amount: float | None = Field(default=None, gt=0)
+    merchant: str | None = Field(default=None, min_length=1, max_length=80)
+    category: str | None = None
+    date: date_type | None = None
+
+
 class TransactionResponse(BaseModel):
     id: int
     date: str
@@ -59,7 +66,18 @@ class BudgetSet(BaseModel):
 class GoalCreate(BaseModel):
     name: str = Field(min_length=2)
     target_amount: float = Field(gt=0)
-    monthly_saving_amount: float = Field(gt=0)
+
+
+class GoalDepositCreate(BaseModel):
+    amount: float = Field(gt=0)
+    date: date_type | None = None
+
+
+class GoalDepositResponse(BaseModel):
+    id: int
+    goal_id: int
+    amount: float
+    date: str
 
 
 class GoalResponse(BaseModel):
@@ -67,7 +85,8 @@ class GoalResponse(BaseModel):
     created_at: str
     name: str
     target_amount: float
-    monthly_saving_amount: float
+    total_deposited: float
     amount_saved: float
     remaining_amount: float
     estimated_months: float
+    deposits: list[GoalDepositResponse] = []
