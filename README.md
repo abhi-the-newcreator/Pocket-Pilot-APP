@@ -34,7 +34,7 @@ pocketpilot/
 ```
 
 ## Features
-- Paste SMS-style messages like `₹250 debited at Zomato` or `₹500 SIP mutual fund`
+- Paste messages like `₹250 debited at Zomato` or `₹500 SIP mutual fund`
 - Automatic amount and merchant extraction
 - Keyword-based category and bucket detection
 - Manual category selection for unknown merchants
