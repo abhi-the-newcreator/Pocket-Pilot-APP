@@ -1,6 +1,6 @@
 # PocketPilot - Smart Finance Manager for Students
 
-PocketPilot is a full-stack student finance dashboard that parses SMS-style transaction messages, auto-categorizes them, splits money into expenses, savings, and investments, predicts financial risk, and tracks goal-based savings.
+PocketPilot is a full-stack student finance dashboard that parses transaction messages, auto-categorizes them, splits money into expenses, savings, and investments, predicts financial risk, and tracks goal-based savings.
 
 ## Tech stack
 - Frontend: HTML, CSS, JavaScript, Chart.js
