@@ -73,80 +73,6 @@ function create3DPieChart(canvasId, labels, values, palette) {
     });
 }
 
-// ── AI Money Advisor ──────────────────────────────────────────────────────────
-
-let _analyticsData = null;
-
-async function getAIAdvice() {
-    const keyInput = document.getElementById('geminiApiKey');
-    let apiKey = keyInput.value.trim() || localStorage.getItem('pp_gemini_key');
-    if (!apiKey) {
-        keyInput.focus();
-        keyInput.style.borderColor = 'var(--danger)';
-        return;
-    }
-    localStorage.setItem('pp_gemini_key', apiKey);
-    keyInput.style.borderColor = '';
-
-    const output = document.getElementById('aiAdviceOutput');
-    output.innerHTML = '<div style="color:var(--muted);font-weight:700;padding:12px 0;"><span class="ai-spinner"></span>Gemini is analysing your finances…</div>';
-
-    if (!_analyticsData) {
-        output.innerHTML = '<div class="alert warning">No spending data loaded yet. Please wait for the page to finish loading.</div>';
-        return;
-    }
-
-    const { totals, average_daily_spending, expense_distribution } = _analyticsData;
-    const topCategories = Object.entries(expense_distribution)
-        .slice(0, 5)
-        .map(([cat, amt]) => `${cat}: ₹${Math.round(amt)}`)
-        .join(', ');
-
-    const prompt = `You are a friendly financial advisor specialising in helping students in India save money. 
-Here is the user's financial snapshot:
-- Total expenses: ₹${totals.expenses}
-- Total savings/income: ₹${totals.savings}
-- Total investments: ₹${totals.investments}
-- Remaining balance: ₹${totals.remaining_balance}
-- Average daily spending: ₹${average_daily_spending}
-- Top spending categories: ${topCategories}
-
-Please give 4-5 concise, practical, student-friendly tips to help this person save more money and manage their spending better. Keep each tip to 1-2 sentences. Use simple language and be encouraging. Add an emoji to each tip.`;
-
-    try {
-        const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { temperature: 0.7, maxOutputTokens: 600 },
-                }),
-            }
-        );
-
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err?.error?.message || `API error ${res.status}`);
-        }
-
-        const json = await res.json();
-        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text || 'No advice returned.';
-
-        output.innerHTML = `
-            <div class="alert suggestion" style="margin-top:4px;">
-                <div class="ai-response">${text.replace(/\n/g, '<br>')}</div>
-            </div>`;
-
-        // Hide key row after success
-        document.getElementById('aiKeyRow').style.display = 'none';
-
-    } catch (err) {
-        output.innerHTML = `<div class="alert warning">⚠️ ${err.message}</div>`;
-    }
-}
-
 // ── Load Analytics ────────────────────────────────────────────────────────────
 
 async function loadAnalytics() {
@@ -181,10 +107,6 @@ async function loadAnalytics() {
     }
 
     renderAlerts(document.getElementById('analyticsWarnings'), [...data.warnings, ...data.suggestions], 'suggestion', 'No analytics generated yet.');
-
-    // Restore saved Gemini key
-    const savedKey = localStorage.getItem('pp_gemini_key');
-    if (savedKey) document.getElementById('geminiApiKey').value = savedKey;
 
     const tableWrap = document.getElementById('analyticsTableWrap');
     if (!data.transactions.length) {

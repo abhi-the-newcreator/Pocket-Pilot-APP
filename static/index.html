@@ -8,6 +8,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script defer src="/static/app.js"></script>
     <script defer src="/static/dashboard.js"></script>
+    <style>
+        #quickTipText {
+            transition: opacity 150ms ease;
+        }
+    </style>
 </head>
 <body>
     <div class="layout">
@@ -50,6 +55,15 @@
                     </div>
                 </div>
                 <div class="hero-orbit"></div>
+            </section>
+
+            <!-- Quick Tip - Motivational Message -->
+            <section class="card" id="quickTipCard" style="margin-top: 20px; background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.06)); border: 1px solid rgba(59,130,246,0.12);">
+                <div class="panel-header">
+                    <h3 style="font-size: 1.1rem;">💡 Quick Tip</h3>
+                    <a href="#" onclick="generateQuickTip(); return false;" style="font-size: 0.8rem; color: var(--primary); text-decoration: none; font-weight: 700;">Load new tip</a>
+                </div>
+                <p id="quickTipText" style="font-size: 1rem; line-height: 1.6; color: var(--text); margin: 0; font-weight: 500;">Loading motivational message...</p>
             </section>
 
             <section class="grid cards" style="margin-top: 20px;">

@@ -66,6 +66,13 @@ class BudgetSet(BaseModel):
 class GoalCreate(BaseModel):
     name: str = Field(min_length=2)
     target_amount: float = Field(gt=0)
+    monthly_saving_amount: float = Field(default=0, ge=0)
+
+
+class GoalUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2)
+    target_amount: float | None = Field(default=None, gt=0)
+    monthly_saving_amount: float | None = Field(default=None, ge=0)
 
 
 class GoalDepositCreate(BaseModel):
@@ -85,8 +92,17 @@ class GoalResponse(BaseModel):
     created_at: str
     name: str
     target_amount: float
+    monthly_saving_amount: float
     total_deposited: float
     amount_saved: float
     remaining_amount: float
     estimated_months: float
     deposits: list[GoalDepositResponse] = []
+
+
+class SavingSuggestion(BaseModel):
+    strategy: str
+    estimated_months: float
+    monthly_saving_amount: float
+    expense_reduction: float
+    details: list[str]

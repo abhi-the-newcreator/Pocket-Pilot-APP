@@ -57,6 +57,11 @@ async function apiFetch(path, options = {}) {
         throw new Error(errorPayload.detail || 'Request failed');
     }
 
+    // For 204 No Content, return null instead of trying to parse JSON
+    if (response.status === 204) {
+        return null;
+    }
+
     return response.json();
 }
 

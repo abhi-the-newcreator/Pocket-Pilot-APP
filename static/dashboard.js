@@ -2,6 +2,47 @@ const dashboardPalette = ['#0f766e', '#f59e0b', '#14b8a6', '#fb7185', '#2563eb',
 
 if (!requireAuth()) throw new Error('unauthenticated');
 
+// ── Motivational Messages ──────────────────────────────────────────────────────
+
+const MOTIVATIONAL_MESSAGES = [
+    "💰 Small savings today lead to big goals tomorrow",
+    "🎯 Consistency beats intensity in financial growth",
+    "✂️ Cutting one expense today builds your future",
+    "🚀 Every rupee saved is a step closer to freedom",
+    "📈 Your money mindset is your greatest wealth asset",
+    "🌱 Plant seeds of savings, harvest financial stability",
+    "⏰ Time is money - the earlier you save, the better",
+    "🛡️ Emergency savings are your financial safety net",
+    "🎁 Delayed gratification today = greater rewards tomorrow",
+    "💪 Financial discipline is a superpower",
+    "🌟 You're one step closer to your goals every day",
+    "🔥 Your financial future is being built right now",
+    "🏆 Winners track their spending and own their money",
+    "💎 Financial freedom starts with small consistent actions",
+    "🚁 Rise above your budget concerns with smart planning",
+    "✨ Your saving journey is inspiring your future self",
+    "🎪 Every transaction is a learning opportunity",
+    "🍀 Good fortune favors those who plan ahead",
+];
+
+function generateQuickTip() {
+    const randomIndex = Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length);
+    const message = MOTIVATIONAL_MESSAGES[randomIndex];
+    const tipElement = document.getElementById('quickTipText');
+    
+    // Fade out effect
+    tipElement.style.opacity = '0.5';
+    
+    setTimeout(() => {
+        tipElement.textContent = message;
+        tipElement.style.opacity = '1';
+    }, 150);
+}
+
+function initQuickTip() {
+    generateQuickTip();
+}
+
 function renderDashBudget(b) {
     document.getElementById('dashBudgetLabel').textContent = `Budget – ${b.month_name}`;
     const daysEl = document.getElementById('dashDaysBadge');
@@ -88,3 +129,4 @@ async function loadDashboard() {
 }
 
 loadDashboard();
+initQuickTip();

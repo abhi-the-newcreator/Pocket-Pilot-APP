@@ -42,7 +42,8 @@ def init_db() -> None:
                 user_id INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL,
                 name TEXT NOT NULL,
-                target_amount REAL NOT NULL
+                target_amount REAL NOT NULL,
+                monthly_saving_amount REAL NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS goal_deposits (
@@ -71,6 +72,14 @@ def init_db() -> None:
                 connection.commit()
             except sqlite3.OperationalError:
                 pass  # column already exists
+        
+        # Add monthly_saving_amount to goals if not exists
+        try:
+            connection.execute("ALTER TABLE goals ADD COLUMN monthly_saving_amount REAL NOT NULL DEFAULT 0")
+            connection.commit()
+        except sqlite3.OperationalError:
+            pass  # column already exists
+        
         # Remove monthly_saving_amount from goals (handled by new deposit system)
         try:
             connection.execute("ALTER TABLE goals ADD COLUMN _dummy INTEGER")

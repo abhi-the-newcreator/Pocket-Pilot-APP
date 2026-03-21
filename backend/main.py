@@ -1,4 +1,4 @@
-from __future__ import annotations
+`from __future__ import annotations
 
 import calendar
 from datetime import date
@@ -17,6 +17,8 @@ from backend.schemas import (
     GoalDepositCreate,
     GoalDepositResponse,
     GoalResponse,
+    GoalUpdate,
+    SavingSuggestion,
     TokenResponse,
     TransactionCreate,
     TransactionResponse,
@@ -24,7 +26,7 @@ from backend.schemas import (
     UserLogin,
     UserRegister,
 )
-from backend.services import CATEGORY_OPTIONS, CATEGORY_TO_BUCKET, analytics_summary, compute_goal_progress, today_iso
+from backend.services import CATEGORY_OPTIONS, CATEGORY_TO_BUCKET, analytics_summary, calculate_astar_suggestion, calculate_astar_with_spending, compute_goal_progress, today_iso
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
@@ -285,6 +287,7 @@ def _goal_with_deposits(goal: dict, user_id: int) -> GoalResponse:
         created_at=goal["created_at"],
         name=goal["name"],
         target_amount=goal["target_amount"],
+        monthly_saving_amount=goal.get("monthly_saving_amount", 0),
         deposits=deposits,
         **progress,
     )
@@ -293,10 +296,16 @@ def _goal_with_deposits(goal: dict, user_id: int) -> GoalResponse:
 @app.post("/api/goals", response_model=GoalResponse)
 def create_goal(payload: GoalCreate, user_id: int = Depends(get_current_user_id)) -> GoalResponse:
     goal_id = execute(
-        "INSERT INTO goals (user_id, created_at, name, target_amount) VALUES (?, ?, ?, ?)",
-        (user_id, today_iso(), payload.name, payload.target_amount),
+        "INSERT INTO goals (user_id, created_at, name, target_amount, monthly_saving_amount) VALUES (?, ?, ?, ?, ?)",
+        (user_id, today_iso(), payload.name, payload.target_amount, payload.monthly_saving_amount),
     )
-    goal = {"id": goal_id, "created_at": today_iso(), "name": payload.name, "target_amount": payload.target_amount}
+    goal = {
+        "id": goal_id,
+        "created_at": today_iso(),
+        "name": payload.name,
+        "target_amount": payload.target_amount,
+        "monthly_saving_amount": payload.monthly_saving_amount,
+    }
     return _goal_with_deposits(goal, user_id)
 
 
@@ -304,6 +313,38 @@ def create_goal(payload: GoalCreate, user_id: int = Depends(get_current_user_id)
 def list_goals(user_id: int = Depends(get_current_user_id)) -> list[GoalResponse]:
     rows = fetch_all("SELECT * FROM goals WHERE user_id = ? ORDER BY id DESC", (user_id,))
     return [_goal_with_deposits(dict(row), user_id) for row in rows]
+
+
+@app.put("/api/goals/{goal_id}", response_model=GoalResponse)
+def update_goal(
+    goal_id: int,
+    payload: GoalUpdate,
+    user_id: int = Depends(get_current_user_id),
+) -> GoalResponse:
+    """Update a goal's properties (name, target_amount, monthly_saving_amount)."""
+    goal_row = fetch_one("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    if not goal_row:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    
+    existing = dict(goal_row)
+    # Update only provided fields
+    new_name = payload.name if payload.name is not None else existing["name"]
+    new_target = payload.target_amount if payload.target_amount is not None else existing["target_amount"]
+    new_monthly = payload.monthly_saving_amount if payload.monthly_saving_amount is not None else existing.get("monthly_saving_amount", 0)
+    
+    execute(
+        "UPDATE goals SET name = ?, target_amount = ?, monthly_saving_amount = ? WHERE id = ? AND user_id = ?",
+        (new_name, new_target, new_monthly, goal_id, user_id),
+    )
+    
+    goal = {
+        "id": goal_id,
+        "created_at": existing["created_at"],
+        "name": new_name,
+        "target_amount": new_target,
+        "monthly_saving_amount": new_monthly,
+    }
+    return _goal_with_deposits(goal, user_id)
 
 
 @app.post("/api/goals/{goal_id}/deposit", response_model=GoalResponse)
@@ -331,6 +372,43 @@ def delete_goal(goal_id: int, user_id: int = Depends(get_current_user_id)) -> No
         raise HTTPException(status_code=404, detail="Goal not found.")
     execute("DELETE FROM goal_deposits WHERE goal_id = ? AND user_id = ?", (goal_id, user_id))
     execute("DELETE FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+
+
+@app.post("/api/goals/{goal_id}/suggestion", response_model=SavingSuggestion)
+def get_saving_suggestion(
+    goal_id: int,
+    user_id: int = Depends(get_current_user_id),
+) -> SavingSuggestion:
+    """Get A* based smart saving suggestion for a goal with spending analysis."""
+    goal_row = fetch_one("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    if not goal_row:
+        raise HTTPException(status_code=404, detail="Goal not found.")
+    
+    goal = dict(goal_row)
+    
+    # Get current saved amount
+    deposit_rows = fetch_all(
+        "SELECT COALESCE(SUM(amount), 0) AS total FROM goal_deposits WHERE goal_id = ? AND user_id = ?",
+        (goal_id, user_id),
+    )
+    current_saved = float(deposit_rows[0]["total"]) if deposit_rows else 0.0
+    
+    # Fetch all user transactions for spending analysis
+    transaction_rows = fetch_all(
+        "SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC",
+        (user_id,),
+    )
+    transactions = [dict(row) for row in transaction_rows]
+    
+    # Use enhanced A* algorithm with spending analysis
+    suggestion = calculate_astar_with_spending(
+        target_amount=goal["target_amount"],
+        current_saved=current_saved,
+        monthly_saving=goal.get("monthly_saving_amount", 0),
+        transactions=transactions,
+    )
+    
+    return SavingSuggestion(**suggestion)
 
 
 # ── Static pages ──────────────────────────────────────────────────────────────

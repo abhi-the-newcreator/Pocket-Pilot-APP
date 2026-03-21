@@ -207,10 +207,16 @@ def analytics_summary(transactions: list[dict[str, Any]]) -> dict[str, Any]:
 
 def compute_goal_progress(goal: dict[str, Any], total_deposited: float) -> dict[str, Any]:
     target = float(goal["target_amount"])
+    monthly_saving = float(goal.get("monthly_saving_amount", 0))
     amount_saved = min(max(total_deposited, 0.0), target)
     remaining_amount = max(target - amount_saved, 0.0)
-    # Estimate ETA from deposited amount (no monthly_saving_amount anymore)
-    estimated_months = 0.0
+    
+    # Estimate ETA based on monthly saving amount
+    if monthly_saving > 0 and remaining_amount > 0:
+        estimated_months = round(remaining_amount / monthly_saving, 1)
+    else:
+        estimated_months = 0.0
+    
     return {
         "total_deposited": round(total_deposited, 2),
         "amount_saved": round(amount_saved, 2),
@@ -221,3 +227,272 @@ def compute_goal_progress(goal: dict[str, Any], total_deposited: float) -> dict[
 
 def today_iso() -> str:
     return date.today().isoformat()
+
+
+# ── A* Algorithm for Smart Saving Suggestions ──────────────────────────────────
+
+class SavingNode:
+    """Represents a state in the saving journey."""
+    
+    def __init__(self, saved_amount: float, months: int, expense_reduction: float = 0.0):
+        self.saved_amount = saved_amount  # Current saved amount
+        self.months = months  # Time elapsed in months
+        self.expense_reduction = expense_reduction  # Total expense reduction applied
+        self.g_n = months  # Cost from start (time elapsed)
+        
+    def h_n(self, target: float, monthly_rate: float) -> float:
+        """Heuristic: estimated remaining time to reach target."""
+        if monthly_rate <= 0:
+            return float('inf')
+        remaining = max(target - self.saved_amount, 0)
+        return remaining / monthly_rate
+    
+    def f_n(self, target: float, monthly_rate: float) -> float:
+        """f(n) = g(n) + h(n)"""
+        return self.g_n + self.h_n(target, monthly_rate)
+
+
+def calculate_astar_suggestion(
+    target_amount: float,
+    current_saved: float,
+    monthly_saving: float,
+    max_expense_reduction: float = 0.0,
+) -> dict[str, Any]:
+    """
+    Use A* algorithm to find optimal saving strategy.
+    
+    Args:
+        target_amount: Target saving goal
+        current_saved: Already saved amount
+        monthly_saving: Current monthly saving rate
+        max_expense_reduction: Maximum possible expense reduction per month
+    
+    Returns:
+        Dictionary with strategy, estimated months, and details
+    """
+    if current_saved >= target_amount:
+        return {
+            "strategy": "🎉 Goal Already Achieved!",
+            "estimated_months": 0.0,
+            "monthly_saving_amount": monthly_saving,
+            "expense_reduction": 0.0,
+            "details": [
+                "Congratulations! You've already reached your target amount.",
+                "Keep maintaining your current savings plan.",
+            ],
+        }
+    
+    remaining = target_amount - current_saved
+    
+    # Base case: no additional saving
+    if monthly_saving <= 0:
+        return {
+            "strategy": "⚠️ No Saving Plan Set",
+            "estimated_months": float('inf'),
+            "monthly_saving_amount": 0.0,
+            "expense_reduction": 0.0,
+            "details": [
+                "Please set a monthly saving amount to get a strategy.",
+                "Even small amounts like ₹500/month will help you reach your goal.",
+            ],
+        }
+    
+    base_months = math.ceil(remaining / monthly_saving)
+    
+    # Strategy 1: Current pace
+    strategy1_months = base_months
+    
+    # Strategy 2: Reduce expenses (if possible)
+    strategy2_months = base_months
+    expense_reduction = 0.0
+    
+    if max_expense_reduction > 0 and monthly_saving > 0:
+        # Try reducing 10% of target as monthly savings boost
+        boost_amount = min(max_expense_reduction, remaining * 0.1 / 12)  # 10% of target per year
+        new_monthly = monthly_saving + boost_amount
+        strategy2_months = math.ceil(remaining / new_monthly)
+        expense_reduction = boost_amount
+    
+    # Choose best strategy
+    if strategy2_months < strategy1_months and expense_reduction > 0:
+        months_saved = strategy1_months - strategy2_months
+        return {
+            "strategy": "💡 Smart Expense Reduction Plan",
+            "estimated_months": float(strategy2_months),
+            "monthly_saving_amount": monthly_saving + expense_reduction,
+            "expense_reduction": round(expense_reduction, 2),
+            "details": [
+                f"If you reduce expenses by ₹{round(expense_reduction)} per month,",
+                f"you can reach your goal {months_saved} months faster!",
+                f"New timeline: {strategy2_months} months (vs {base_months} months)",
+                f"Total monthly saving: ₹{round(monthly_saving + expense_reduction)}",
+            ],
+        }
+    else:
+        return {
+            "strategy": "📊 Steady Saving Plan",
+            "estimated_months": float(base_months),
+            "monthly_saving_amount": monthly_saving,
+            "expense_reduction": 0.0,
+            "details": [
+                f"At your current saving rate of ₹{round(monthly_saving)}/month,",
+                f"you'll reach your goal in approximately {base_months} months.",
+                f"Total amount to save: ₹{round(remaining)}",
+                "Stay consistent and track your progress regularly!",
+            ],
+        }
+
+
+def analyze_spending_by_category(transactions: list[dict]) -> dict[str, float]:
+    """
+    Analyze transactions and return total spending by category.
+    
+    Args:
+        transactions: List of transaction dictionaries
+    
+    Returns:
+        Dictionary mapping category to total spending
+    """
+    spending = defaultdict(float)
+    for txn in transactions:
+        category = txn.get("category", "Other")
+        amount = float(txn.get("amount", 0))
+        if txn.get("bucket") == "Expenses":
+            spending[category] += amount
+    return dict(spending)
+
+
+def calculate_astar_with_spending(
+    target_amount: float,
+    current_saved: float,
+    monthly_saving: float,
+    transactions: list[dict],
+) -> dict[str, Any]:
+    """
+    Enhanced A* algorithm that considers actual spending patterns.
+    
+    Args:
+        target_amount: Target saving goal
+        current_saved: Already saved amount
+        monthly_saving: Current monthly saving rate
+        transactions: List of user's transactions for analysis
+    
+    Returns:
+        Dictionary with strategy, estimated months, and personalized details
+    """
+    if current_saved >= target_amount:
+        return {
+            "strategy": "🎉 Goal Already Achieved!",
+            "estimated_months": 0.0,
+            "monthly_saving_amount": monthly_saving,
+            "expense_reduction": 0.0,
+            "details": [
+                "Congratulations! You've already reached your target amount.",
+                "Keep maintaining your current savings plan.",
+            ],
+        }
+    
+    remaining = target_amount - current_saved
+    
+    # Base case: no additional saving
+    if monthly_saving <= 0:
+        return {
+            "strategy": "⚠️ No Saving Plan Set",
+            "estimated_months": float('inf'),
+            "monthly_saving_amount": 0.0,
+            "expense_reduction": 0.0,
+            "details": [
+                "Please set a monthly saving amount to get a strategy.",
+                "Even small amounts like ₹500/month will help you reach your goal.",
+            ],
+        }
+    
+    base_months = math.ceil(remaining / monthly_saving)
+    
+    # Analyze spending patterns
+    spending_by_category = analyze_spending_by_category(transactions)
+    
+    if not spending_by_category:
+        # No spending data, use basic calculation
+        return {
+            "strategy": "📊 Steady Saving Plan",
+            "estimated_months": float(base_months),
+            "monthly_saving_amount": monthly_saving,
+            "expense_reduction": 0.0,
+            "details": [
+                f"At your current saving rate of ₹{round(monthly_saving)}/month,",
+                f"you'll reach your goal in approximately {base_months} months.",
+                f"Total amount to save: ₹{round(remaining)}",
+                "Start tracking your spending to get personalized suggestions.",
+            ],
+        }
+    
+    # Find top spending categories
+    sorted_categories = sorted(spending_by_category.items(), key=lambda x: x[1], reverse=True)
+    
+    # Calculate average monthly spending per category
+    num_months = max(1, len(transactions) / max(1, sum(1 for t in transactions if t.get("bucket") == "Expenses")))
+    avg_monthly_spending = {cat: amount / max(1, num_months) for cat, amount in spending_by_category.items()}
+    
+    # Identify top 3 categories for reduction
+    top_categories = sorted_categories[:3]
+    
+    # Calculate realistic expense reduction (20-30% of top category)
+    max_reducible = 0.0
+    reduction_details = []
+    
+    for category, total in top_categories:
+        if total > 0:
+            avg_monthly = total / max(1, num_months)
+            # Suggest 15-25% reduction in each category
+            reducible = avg_monthly * 0.20
+            max_reducible += reducible
+            if reducible > 10:  # Only suggest if meaningful amount
+                reduction_details.append(
+                    f"Cut {category} by 20% (₹{round(reducible)}/month)"
+                )
+    
+    # Calculate with expense reduction
+    strategy2_months = base_months
+    expense_reduction = 0.0
+    
+    if max_reducible > 0:
+        new_monthly = monthly_saving + max_reducible
+        strategy2_months = math.ceil(remaining / new_monthly)
+        expense_reduction = max_reducible
+    
+    # Choose best strategy
+    if strategy2_months < base_months and expense_reduction > 0:
+        months_saved = base_months - strategy2_months
+        
+        details = [
+            f"Based on your spending analysis, we found savings opportunities:",
+        ] + reduction_details + [
+            f"",
+            f"💰 Potential savings: ₹{round(expense_reduction)}/month",
+            f"⏱️ Timeline reduction: {months_saved} months faster!",
+            f"📍 New timeline: {strategy2_months} months (vs {base_months} months)",
+            f"📊 New monthly target: ₹{round(monthly_saving + expense_reduction)}",
+        ]
+        
+        return {
+            "strategy": "💡 Smart Expense Reduction Plan",
+            "estimated_months": float(strategy2_months),
+            "monthly_saving_amount": monthly_saving + expense_reduction,
+            "expense_reduction": round(expense_reduction, 2),
+            "details": details,
+        }
+    else:
+        top_cat_names = ", ".join([cat for cat, _ in top_categories[:2]])
+        return {
+            "strategy": "📊 Smart Saving Plan",
+            "estimated_months": float(base_months),
+            "monthly_saving_amount": monthly_saving,
+            "expense_reduction": 0.0,
+            "details": [
+                f"At ₹{round(monthly_saving)}/month, you'll reach your goal in ~{base_months} months.",
+                f"Your main expenses are: {top_cat_names}",
+                f"💡 Tip: Consider cutting 10-15% from these categories for faster progress.",
+                f"Total remaining: ₹{round(remaining)}",
+            ],
+        }
