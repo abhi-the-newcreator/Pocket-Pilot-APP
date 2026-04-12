@@ -1,4 +1,5 @@
 const API_BASE = '/api';
+const THEME_KEY = 'pp_theme';
 
 function getToken() {
     return localStorage.getItem('pp_token');
@@ -6,6 +7,42 @@ function getToken() {
 
 function getUser() {
     try { return JSON.parse(localStorage.getItem('pp_user') || 'null'); } catch { return null; }
+}
+
+function applyTheme(theme) {
+    const normalized = theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', normalized);
+    const toggle = document.getElementById('themeToggleBtn');
+    if (toggle) {
+        toggle.setAttribute('aria-label', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+        toggle.setAttribute('title', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+    }
+}
+
+function initTheme() {
+    const savedTheme = localStorage.getItem(THEME_KEY) || 'light';
+    applyTheme(savedTheme);
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const nextTheme = current === 'dark' ? 'light' : 'dark';
+    localStorage.setItem(THEME_KEY, nextTheme);
+    applyTheme(nextTheme);
+}
+
+function mountThemeToggle() {
+    if (document.getElementById('themeToggleBtn')) return;
+    const toggle = document.createElement('button');
+    toggle.id = 'themeToggleBtn';
+    toggle.className = 'theme-toggle';
+    toggle.type = 'button';
+    toggle.textContent = '🌙';
+    toggle.setAttribute('aria-label', 'Toggle dark mode');
+    toggle.setAttribute('title', 'Toggle dark mode');
+    toggle.addEventListener('click', toggleTheme);
+    document.body.appendChild(toggle);
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
 }
 
 function logout() {
@@ -115,3 +152,10 @@ function createDoughnutChart(canvasId, labels, values, palette) {
 }
 
 setActiveNav();
+initTheme();
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mountThemeToggle);
+} else {
+    mountThemeToggle();
+}

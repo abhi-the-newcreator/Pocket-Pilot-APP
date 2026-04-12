@@ -1,5 +1,19 @@
 if (!requireAuth()) throw new Error('unauthenticated');
 
+function getBudgetStorageKeys() {
+    const user = getUser();
+    const userId = user?.id || 'guest';
+    return {
+        defaultBudget: `pp_budget_default_${userId}`,
+        appliedMonth: `pp_budget_applied_month_${userId}`,
+    };
+}
+
+function currentYearMonth() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 // Category definitions with icons and labels
 const CATEGORIES = [
     { id: 'Food',          icon: '🍔', label: 'Food'          },
@@ -67,10 +81,28 @@ function renderBudget(b) {
 
 async function loadBudget() {
     try {
-        const b = await apiFetch('/budget');
-        renderBudget(b);
-        if (b.budget_amount > 0) {
-            document.getElementById('budgetInput').placeholder = `Current: ${formatCurrency(b.budget_amount)}`;
+        const keys = getBudgetStorageKeys();
+        const ym = currentYearMonth();
+        let budgetData = await apiFetch('/budget');
+
+        if (Number(budgetData.budget_amount || 0) > 0) {
+            localStorage.setItem(keys.defaultBudget, String(budgetData.budget_amount));
+            localStorage.setItem(keys.appliedMonth, ym);
+        } else {
+            const storedBudget = Number(localStorage.getItem(keys.defaultBudget) || 0);
+            const appliedMonth = localStorage.getItem(keys.appliedMonth);
+            if (storedBudget > 0 && appliedMonth !== ym) {
+                budgetData = await apiFetch('/budget', {
+                    method: 'POST',
+                    body: JSON.stringify({ amount: storedBudget }),
+                });
+                localStorage.setItem(keys.appliedMonth, ym);
+            }
+        }
+
+        renderBudget(budgetData);
+        if (budgetData.budget_amount > 0) {
+            document.getElementById('budgetInput').placeholder = `Current: ${formatCurrency(budgetData.budget_amount)}`;
         }
     } catch (_) { /* non-critical */ }
 }
@@ -79,8 +111,11 @@ async function saveBudget() {
     const val = parseFloat(document.getElementById('budgetInput').value);
     if (!val || val <= 0) return;
     try {
+        const keys = getBudgetStorageKeys();
         const b = await apiFetch('/budget', { method: 'POST', body: JSON.stringify({ amount: val }) });
         renderBudget(b);
+        localStorage.setItem(keys.defaultBudget, String(val));
+        localStorage.setItem(keys.appliedMonth, currentYearMonth());
         document.getElementById('budgetInput').value = '';
         document.getElementById('budgetInput').placeholder = `Current: ${formatCurrency(b.budget_amount)}`;
     } catch (err) {

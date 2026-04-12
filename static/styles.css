@@ -136,7 +136,6 @@ textarea {
     align-items: center;
     margin-bottom: 24px;
 }
-
 .topbar h2 {
     margin: 0;
     font-family: 'Space Grotesk', sans-serif;
@@ -548,6 +547,91 @@ textarea {
     flex-direction: column;
 }
 
+html[data-theme='dark'] {
+    --bg: #0d1418;
+    --bg-accent: #111c20;
+    --surface: rgba(20, 31, 37, 0.82);
+    --surface-strong: #17262d;
+    --text: #e8f0f4;
+    --muted: #9eb1bb;
+    --line: rgba(232, 240, 244, 0.12);
+    --primary: #22c1b5;
+    --primary-soft: rgba(34, 193, 181, 0.16);
+    --danger: #fb8b59;
+    --danger-soft: rgba(251, 139, 89, 0.16);
+    --success: #55d38f;
+    --success-soft: rgba(85, 211, 143, 0.16);
+    --shadow: 0 24px 50px rgba(0, 0, 0, 0.35);
+}
+
+.theme-toggle {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-size: 1.15rem;
+    cursor: pointer;
+    z-index: 1400;
+    color: var(--text);
+    background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+    box-shadow: 0 10px 24px rgba(24, 33, 38, 0.16);
+    transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.theme-toggle:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(24, 33, 38, 0.22);
+}
+
+html[data-theme='dark'] .sidebar {
+    background: rgba(12, 20, 25, 0.65);
+}
+
+html[data-theme='dark'] .nav-link:hover,
+html[data-theme='dark'] .nav-link.active {
+    background: rgba(26, 42, 49, 0.86);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+}
+
+html[data-theme='dark'] input,
+html[data-theme='dark'] select,
+html[data-theme='dark'] textarea {
+    background: rgba(16, 26, 32, 0.9);
+    border-color: rgba(232, 240, 244, 0.14);
+}
+
+html[data-theme='dark'] .list-item,
+html[data-theme='dark'] .kpi-box,
+html[data-theme='dark'] .badge,
+html[data-theme='dark'] .alert,
+html[data-theme='dark'] .btn-logout {
+    background: rgba(20, 31, 37, 0.86);
+}
+
+html[data-theme='dark'] .alert.warning {
+    background: rgba(64, 35, 24, 0.7);
+    border-color: rgba(251, 139, 89, 0.35);
+}
+
+html[data-theme='dark'] .alert.suggestion {
+    background: rgba(27, 56, 43, 0.72);
+    border-color: rgba(85, 211, 143, 0.32);
+}
+
+html[data-theme='dark'] .card,
+html[data-theme='dark'] .list-item,
+html[data-theme='dark'] .kpi-box,
+html[data-theme='dark'] .table th,
+html[data-theme='dark'] .table td,
+html[data-theme='dark'] #quickTipCard {
+    border-color: rgba(232, 240, 244, 0.12) !important;
+}
+
 @media (max-width: 1100px) {
     .layout {
         grid-template-columns: 1fr;
@@ -584,5 +668,12 @@ textarea {
 
     .card {
         padding: 18px;
+    }
+
+    .theme-toggle {
+        top: 12px;
+        right: 12px;
+        width: 40px;
+        height: 40px;
     }
 }

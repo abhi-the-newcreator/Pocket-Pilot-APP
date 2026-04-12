@@ -10,11 +10,32 @@ function daysLeftInMonth() {
     return lastDay - now.getDate();
 }
 
+function shadeHexColor(hex, percent) {
+    const color = hex.replace('#', '');
+    const fullHex = color.length === 3
+        ? color.split('').map((c) => c + c).join('')
+        : color;
+    const num = Number.parseInt(fullHex, 16);
+    const amt = Math.round(2.55 * percent);
+    const r = Math.min(255, Math.max(0, (num >> 16) + amt));
+    const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + amt));
+    const b = Math.min(255, Math.max(0, (num & 0x0000ff) + amt));
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
 // ── 3D Pie Chart ──────────────────────────────────────────────────────────────
 
 function create3DPieChart(canvasId, labels, values, palette) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return null;
+
+    const ctx = canvas.getContext('2d');
+    const gradientPalette = palette.map((baseColor) => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 320);
+        gradient.addColorStop(0, shadeHexColor(baseColor, 18));
+        gradient.addColorStop(1, shadeHexColor(baseColor, -14));
+        return gradient;
+    });
 
     // Custom plugin for pseudo-3D shadow/depth
     const shadow3dPlugin = {
@@ -38,9 +59,9 @@ function create3DPieChart(canvasId, labels, values, palette) {
             labels,
             datasets: [{
                 data: values,
-                backgroundColor: palette,
+                backgroundColor: gradientPalette,
                 borderWidth: 3,
-                borderColor: '#fff',
+                borderColor: 'rgba(255,255,255,0.85)',
                 hoverOffset: 16,
             }],
         },
@@ -76,24 +97,40 @@ function create3DPieChart(canvasId, labels, values, palette) {
 // ── Load Analytics ────────────────────────────────────────────────────────────
 
 async function loadAnalytics() {
-    const data = await apiFetch('/analytics');
+    const [data, budget] = await Promise.all([apiFetch('/analytics'), apiFetch('/budget')]);
     _analyticsData = data;
 
-    document.getElementById('avgSpendMetric').textContent = formatCurrency(data.average_daily_spending);
+    const daysPassed = Math.max(Number(budget.days_elapsed || 0), 1);
+    const totalExpenseSoFar = Number(budget.spent_this_month || 0);
+    const averageDailyExpense = totalExpenseSoFar > 0 ? totalExpenseSoFar / daysPassed : 0;
+    const remainingBudget = Number(budget.remaining || 0);
 
-    // "Money will last" — uses predicted_days_left (remaining balance ÷ avg daily spend)
-    const survivalDays = data.predicted_days_left;
+    document.getElementById('avgSpendMetric').textContent = formatCurrency(averageDailyExpense);
+
+    let survivalDays = null;
+    if (remainingBudget <= 0 && budget.budget_amount > 0) {
+        survivalDays = 0;
+    } else if (averageDailyExpense > 0 && remainingBudget > 0) {
+        survivalDays = Math.floor(remainingBudget / averageDailyExpense);
+    }
     document.getElementById('activeDaysMetric').textContent =
-        survivalDays !== null && survivalDays !== undefined ? `${survivalDays} day${survivalDays !== 1 ? 's' : ''}` : '∞';
+        survivalDays !== null ? `${survivalDays} day${survivalDays !== 1 ? 's' : ''}` : 'N/A';
 
     // "Days left in month" computed client-side
     const dlm = daysLeftInMonth();
     document.getElementById('forecastMetric').textContent = `${dlm} day${dlm !== 1 ? 's' : ''}`;
 
-    document.getElementById('averageSpendBadge').textContent = `Avg daily spend: ${formatCurrency(data.average_daily_spending)}`;
+    document.getElementById('averageSpendBadge').textContent = `Avg daily spend: ${formatCurrency(averageDailyExpense)}`;
 
     const expenseEntries = Object.entries(data.expense_distribution);
-    document.getElementById('topCategoryMetric').textContent = expenseEntries.length ? expenseEntries[0][0] : 'N/A';
+    if (expenseEntries.length) {
+        const [topCategory, topValue] = expenseEntries[0];
+        const totalExpense = expenseEntries.reduce((sum, [, value]) => sum + Number(value || 0), 0);
+        const percentage = totalExpense > 0 ? ((Number(topValue) / totalExpense) * 100).toFixed(2) : '0.00';
+        document.getElementById('topCategoryMetric').textContent = `${topCategory} - ${percentage}%`;
+    } else {
+        document.getElementById('topCategoryMetric').textContent = 'N/A';
+    }
 
     if (expenseEntries.length) {
         create3DPieChart(
